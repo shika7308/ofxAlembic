@@ -93,16 +93,34 @@ void XForm::get(Alembic::AbcGeom::OXformSchema &schema) const
 	schema.set(samp);
 }
 
-void XForm::set(Alembic::AbcGeom::IXformSchema &schema, float time)
+int64_t XForm::set(Alembic::AbcGeom::IXformSchema& schema, double time)
 {
 	ISampleSelector ss(time, ISampleSelector::kNearIndex);
-	
+		
 	const M44d& m = schema.getValue(ss).getMatrix();
 	const double *src = m.getValue();
 	float *dst = mat.getValue();
-	
+		
 	for (int i = 0; i < 16; i++)
 		dst[i] = src[i];
+	
+	int64_t frame = ss.getIndex(schema.getTimeSampling(), schema.getNumSamples());
+	return frame;
+}
+
+double ofxAlembic::XForm::set(Alembic::AbcGeom::IXformSchema& schema, int64_t frame)
+{
+	ISampleSelector ss(frame, ISampleSelector::kNearIndex);
+
+	const M44d& m = schema.getValue(ss).getMatrix();
+	const double* src = m.getValue();
+	float* dst = mat.getValue();
+
+	for (int i = 0; i < 16; i++)
+		dst[i] = src[i];
+
+	double time = schema.getTimeSampling()->getSampleTime(frame);
+	return time;
 }
 
 #pragma mark - Points
@@ -133,7 +151,7 @@ void Points::get(OPointsSchema &schema) const
 	schema.set(sample);
 }
 
-void Points::set(IPointsSchema &schema, float time)
+int64_t Points::set(IPointsSchema &schema, double time)
 {
 	ISampleSelector ss(time, ISampleSelector::kNearIndex);
 	IPointsSchema::Sample sample;
@@ -152,6 +170,16 @@ void Points::set(IPointsSchema &schema, float time)
 		const V3f& v = src[i];
 		points[i].pos = glm::vec3(v.x, v.y, v.z);
 	}
+
+	int64_t frame = ss.getIndex(schema.getTimeSampling(), schema.getNumSamples());
+	return frame;
+}
+
+double Points::set(IPointsSchema& schema, int64_t frame)
+{
+	double time = schema.getTimeSampling()->getSampleTime(frame);
+	set(schema, time);
+	return time;
 }
 
 void Points::draw()
@@ -281,11 +309,13 @@ void PolyMesh::get(OPolyMeshSchema &schema) const
 	schema.set(sample);
 }
 
-void PolyMesh::set(IPolyMeshSchema &schema, float time)
+int64_t PolyMesh::set(IPolyMeshSchema &schema, double time)
 {
 	ISampleSelector ss(time, ISampleSelector::kNearIndex);
 	IPolyMeshSchema::Sample sample;
 	schema.get(sample, ss);
+
+	auto ret = ss.getIndex(schema.getTimeSampling(), schema.getNumSamples());
 
 	P3fArraySamplePtr m_meshP = sample.getPositions();
 	Int32ArraySamplePtr m_meshIndices = sample.getFaceIndices();
@@ -300,7 +330,7 @@ void PolyMesh::set(IPolyMeshSchema &schema, float time)
 		numIndices < 1 ||
 		numPoints < 1)
 	{
-		return;
+		return ret;
 	}
 
 	// TODO: organaize face index
@@ -461,6 +491,14 @@ void PolyMesh::set(IPolyMeshSchema &schema, float time)
 			}
 		}
 	}
+	return ret;
+}
+
+double PolyMesh::set(IPolyMeshSchema& schema, int64_t frame)
+{
+	double time = schema.getTimeSampling()->getSampleTime(frame);
+	set(schema, time);
+	return time;
 }
 
 void PolyMesh::draw()
@@ -501,7 +539,7 @@ void Curves::get(OCurvesSchema &schema) const
 	schema.set(sample);
 }
 
-void Curves::set(ICurvesSchema &schema, float time)
+int64_t Curves::set(ICurvesSchema &schema, double time)
 {
 	ISampleSelector ss(time, ISampleSelector::kNearIndex);
 	ICurvesSchema::Sample sample;
@@ -530,6 +568,16 @@ void Curves::set(ICurvesSchema &schema, float time)
 			src++;
 		}
 	}
+
+	int64_t frame = ss.getIndex(schema.getTimeSampling(), schema.getNumSamples());
+	return frame;
+}
+
+double Curves::set(ICurvesSchema& schema, int64_t frame)
+{
+	double time = schema.getTimeSampling()->getSampleTime(frame);
+	set(schema, time);
+	return time;
 }
 
 void Curves::draw()
@@ -552,10 +600,22 @@ void Camera::get(OCameraSchema &schema) const
 	schema.set(sample);
 }
 
-void Camera::set(ICameraSchema &schema, float time)
+int64_t Camera::set(ICameraSchema &schema, double time)
 {
 	ISampleSelector ss(time, ISampleSelector::kNearIndex);
 	schema.get(sample, ss);
+
+	int64_t frame = ss.getIndex(schema.getTimeSampling(), schema.getNumSamples());
+	return frame;
+}
+
+double Camera::set(ICameraSchema& schema, int64_t frame)
+{
+	ISampleSelector ss(frame, ISampleSelector::kNearIndex);
+	schema.get(sample, ss);
+
+	double time = schema.getTimeSampling()->getSampleTime(frame);
+	return time;
 }
 
 void Camera::updateSample(const ofCamera &camera)
@@ -594,6 +654,9 @@ void Camera::updateParams(ofCamera &camera, ofMatrix4x4 xform)
 	camera.setFov(fovV);
 	camera.setGlobalPosition(xform.getTranslation());
 	camera.setGlobalOrientation(xform.getRotate());
+	camera.setNearClip(sample.getNearClippingPlane());
+	camera.setFarClip(sample.getFarClippingPlane());
+	camera.setLensOffset({ sample.getHorizontalFilmOffset() / sample.getHorizontalAperture(), sample.getVerticalFilmOffset() / sample.getHorizontalAperture() / sample.getLensSqueezeRatio() });
 
 	// TODO: lens offset
 }

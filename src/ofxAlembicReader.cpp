@@ -26,15 +26,32 @@ ofxAlembic::IXform::~IXform()
 		m_xform.reset();
 }
 
-void ofxAlembic::IXform::updateWithTimeInternal(double time, Imath::M44f& xform)
+frame_t ofxAlembic::IXform::updateWithTimeInternal(double time, Imath::M44f& xform)
 {
+	frame_t ret = 0;
 	if (!m_xform.getSchema().isConstant()
 		&& ofInRange(time, m_minTime, m_maxTime))
 	{
-		this->xform.set(m_xform.getSchema(), time);
+		ret = this->xform.set(m_xform.getSchema(), time);
 	}
 	
 	xform = this->xform.mat * xform;
+
+	return ret;
+}
+
+double ofxAlembic::IXform::updateWithFrameInternal(frame_t frame, Imath::M44f& xform)
+{
+	double ret = 0;
+	if (!m_xform.getSchema().isConstant()
+		&& 0 <= frame && frame < m_frameCount)
+	{
+		ret = this->xform.set(m_xform.getSchema(), (int64_t)frame);
+	}
+
+	xform = this->xform.mat * xform;
+
+	return ret;
 }
 
 #pragma mark - IPoints
@@ -50,10 +67,18 @@ ofxAlembic::IPoints::IPoints(Alembic::AbcGeom::IPoints object) : ofxAlembic::IGe
 	}
 }
 
-void ofxAlembic::IPoints::updateWithTimeInternal(double time, Imath::M44f& xform)
+frame_t ofxAlembic::IPoints::updateWithTimeInternal(double time, Imath::M44f& xform)
 {
-	if (m_points.getSchema().isConstant()) return;
-	points.set(m_points.getSchema(), time);
+	if (m_points.getSchema().isConstant()) return 0;
+	auto frame = points.set(m_points.getSchema(), time);
+	return frame;
+}
+
+double ofxAlembic::IPoints::updateWithFrameInternal(frame_t frame, Imath::M44f& xform)
+{
+	if (m_points.getSchema().isConstant()) return 0;
+	auto time = points.set(m_points.getSchema(), (int64_t)frame);
+	return time;
 }
 
 #pragma mark - ICurves
@@ -69,10 +94,18 @@ ofxAlembic::ICurves::ICurves(Alembic::AbcGeom::ICurves object) : ofxAlembic::IGe
 	}
 }
 
-void ofxAlembic::ICurves::updateWithTimeInternal(double time, Imath::M44f& xform)
+frame_t ofxAlembic::ICurves::updateWithTimeInternal(double time, Imath::M44f& xform)
 {
-	if (m_curves.getSchema().isConstant()) return;
-	curves.set(m_curves.getSchema(), time);
+	if (m_curves.getSchema().isConstant()) return 0;
+	auto frame = curves.set(m_curves.getSchema(), time);
+	return frame;
+}
+
+double ofxAlembic::ICurves::updateWithFrameInternal(frame_t frame, Imath::M44f& xform)
+{
+	if (m_curves.getSchema().isConstant()) return 0;
+	auto time = curves.set(m_curves.getSchema(), (int64_t)frame);
+	return time;
 }
 
 #pragma mark - IPolyMesh
@@ -88,10 +121,18 @@ ofxAlembic::IPolyMesh::IPolyMesh(Alembic::AbcGeom::IPolyMesh object) : ofxAlembi
 	}
 }
 
-void ofxAlembic::IPolyMesh::updateWithTimeInternal(double time, Imath::M44f& xform)
+frame_t ofxAlembic::IPolyMesh::updateWithTimeInternal(double time, Imath::M44f& xform)
 {
-	if (m_polyMesh.getSchema().isConstant()) return;
-	polymesh.set(m_polyMesh.getSchema(), time);
+	if (m_polyMesh.getSchema().isConstant()) return 0;
+	auto frame = polymesh.set(m_polyMesh.getSchema(), time);
+	return frame;
+}
+
+double ofxAlembic::IPolyMesh::updateWithFrameInternal(frame_t frame, Imath::M44f& xform)
+{
+	if (m_polyMesh.getSchema().isConstant()) return 0;
+	auto time = polymesh.set(m_polyMesh.getSchema(), (int64_t)frame);
+	return time;
 }
 
 #pragma mark - ICamera
@@ -107,10 +148,18 @@ ofxAlembic::ICamera::ICamera(Alembic::AbcGeom::ICamera object) : ofxAlembic::IGe
 	}
 }
 
-void ofxAlembic::ICamera::updateWithTimeInternal(double time, Imath::M44f& xform)
+frame_t ofxAlembic::ICamera::updateWithTimeInternal(double time, Imath::M44f& xform)
 {
-	if (m_camera.getSchema().isConstant()) return;
-	camera.set(m_camera.getSchema(), time);
+	if (m_camera.getSchema().isConstant()) return 0;
+	auto frame = camera.set(m_camera.getSchema(), time);
+	return frame;
+}
+
+double ofxAlembic::ICamera::updateWithFrameInternal(frame_t frame, Imath::M44f& xform)
+{
+	if (m_camera.getSchema().isConstant()) return 0;
+	auto time = camera.set(m_camera.getSchema(), (int64_t)frame);
+	return time;
 }
 
 #pragma mark - Reader
@@ -165,6 +214,7 @@ bool ofxAlembic::Reader::open(const string& path)
 
 	m_minTime = m_root->m_minTime;
 	m_maxTime = m_root->m_maxTime;
+	m_frameCount = m_root->m_frameCount;
 
 	return true;
 }
@@ -203,8 +253,21 @@ void ofxAlembic::Reader::setTime(double time)
 
 	Imath::M44f m;
 	m.makeIdentity();
-	m_root->updateWithTime(time, m);
+	auto frame = m_root->updateWithTime(time, m);
 
+	current_time = time;
+	current_frame = frame;
+}
+
+void ofxAlembic::Reader::setFrame(frame_t frame)
+{
+	if (!m_root) return;
+
+	Imath::M44f m;
+	m.makeIdentity();
+	auto time = m_root->updateWithFrame(frame, m);
+
+	current_frame = frame;
 	current_time = time;
 }
 
@@ -298,9 +361,21 @@ bool ofxAlembic::Reader::get(size_t idx, ofCamera &camera)
 	return o->get(camera);
 }
 
+bool ofxAlembic::Reader::get(ofCamera& camera)
+{
+	size_t i = 0;
+	for each (auto & obj in object_arr)
+	{
+		if (obj->isTypeOf<ofxAlembic::Camera>())
+			return this->get(i, camera);
+		i++;
+	}
+	return false;
+}
+
 #pragma mark - IGeom
 
-IGeom::IGeom() : m_minTime(std::numeric_limits<float>::infinity()), m_maxTime(0), type(UNKHOWN) {}
+IGeom::IGeom() : m_minTime(std::numeric_limits<float>::infinity()), m_maxTime(0), type(UNKHOWN), m_frameCount(0), index(0) {}
 
 IGeom::IGeom(Alembic::AbcGeom::IObject object) : m_object(object), m_minTime(std::numeric_limits<float>::infinity()), m_maxTime(0), type(UNKHOWN)
 {
@@ -315,6 +390,27 @@ IGeom::~IGeom()
 		m_object.reset();
 }
 
+template <class ISchema>
+frame_t getFrameCount(Alembic::AbcGeom::ISchemaObject<ISchema> obj) {
+	return obj.getSchema().getNumSamples();
+}
+
+template <class TMatcher, class TMapped>
+bool initializePtr(ofPtr<IGeom>& dptr, frame_t& frameCount, IObject& object, const ObjectHeader& ohead)
+{
+	if (TMatcher::matches(ohead))
+	{
+		TMatcher obj(object, ohead.getName());
+		if (obj)
+		{
+			dptr.reset(new TMapped(obj));
+			frameCount = getFrameCount(obj);
+		}
+		return true;
+	}
+	return false;
+}
+
 void IGeom::setupWithObject(IObject object)
 {
 	size_t numChildren = object.getNumChildren();
@@ -323,68 +419,37 @@ void IGeom::setupWithObject(IObject object)
 	{
 		const ObjectHeader &ohead = object.getChildHeader(i);
 
+		auto test = [&] { return i + 1; };
+		auto aaa = test();
+
 		ofPtr<IGeom> dptr;
-		if (Alembic::AbcGeom::IPolyMesh::matches(ohead))
-		{
-			Alembic::AbcGeom::IPolyMesh pmesh(object, ohead.getName());
-			if (pmesh)
-			{
-				dptr.reset(new ofxAlembic::IPolyMesh(pmesh));
-			}
-		}
-		else if (Alembic::AbcGeom::IPoints::matches(ohead))
-		{
-			Alembic::AbcGeom::IPoints points(object, ohead.getName());
-			if (points)
-			{
-				dptr.reset(new ofxAlembic::IPoints(points));
-			}
-		}
-		else if (Alembic::AbcGeom::ICurves::matches(ohead))
-		{
-			Alembic::AbcGeom::ICurves curves(object, ohead.getName());
-			if (curves)
-			{
-				dptr.reset(new ofxAlembic::ICurves(curves));
-			}
-		}
+		frame_t frameCount;
+		if (initializePtr< Alembic::AbcGeom::IPolyMesh, ofxAlembic::IPolyMesh>(dptr, frameCount, object, ohead)) {}
+		else if (initializePtr< Alembic::AbcGeom::IPoints, ofxAlembic::IPoints>(dptr, frameCount, object, ohead)) {}
+		else if (initializePtr< Alembic::AbcGeom::ICurves, ofxAlembic::ICurves>(dptr, frameCount, object, ohead)) {}
+		else if (initializePtr< Alembic::AbcGeom::IXform, ofxAlembic::IXform>(dptr, frameCount, object, ohead)) {}
+		else if (initializePtr< Alembic::AbcGeom::ICamera, ofxAlembic::ICamera>(dptr, frameCount, object, ohead)) {}
 		else if (Alembic::AbcGeom::INuPatch::matches(ohead))
 		{
 			ofLogError("ofxAlembic") << "INuPatch not implemented";
 			assert(false);
 
-//			Alembic::AbcGeom::INuPatch nuPatch(object, ohead.getName());
-//			if ( nuPatch )
-//			{
-//				dptr.reset( new INuPatchDrw( nuPatch ) );
-//			}
-		}
-		else if (Alembic::AbcGeom::IXform::matches(ohead))
-		{
-			Alembic::AbcGeom::IXform xform(object, ohead.getName());
-			if (xform)
-			{
-				dptr.reset(new ofxAlembic::IXform(xform));
-			}
+			//			Alembic::AbcGeom::INuPatch nuPatch(object, ohead.getName());
+			//			if ( nuPatch )
+			//			{
+			//				dptr.reset( new INuPatchDrw( nuPatch ) );
+			//			}
 		}
 		else if (Alembic::AbcGeom::ISubD::matches(ohead))
 		{
 			ofLogError("ofxAlembic") << "ISubD not implemented";
 			assert(false);
 
-//			Alembic::AbcGeom::ISubD subd(object, ohead.getName());
-//			if ( subd )
-//			{
-//				dptr.reset( new ISubDDrw( subd ) );
-//			}
-		}
-		else if (Alembic::AbcGeom::ICamera::matches(ohead))
-		{
-			Alembic::AbcGeom::ICamera camera(object, ohead.getName());
-			if (camera)
-			{
-				dptr.reset(new ofxAlembic::ICamera(camera));
-			}
+			//			Alembic::AbcGeom::ISubD subd(object, ohead.getName());
+			//			if ( subd )
+			//			{
+			//				dptr.reset( new ISubDDrw( subd ) );
+			//			}
 		}
 		else
 		{
@@ -397,6 +462,7 @@ void IGeom::setupWithObject(IObject object)
 			m_children.push_back(dptr);
 			m_minTime = std::min(m_minTime, dptr->m_minTime);
 			m_maxTime = std::max(m_maxTime, dptr->m_maxTime);
+			m_frameCount = frameCount;
 		}
 	}
 }
@@ -439,16 +505,36 @@ string IGeom::getFullName() const
 	return m_object.getFullName();
 }
 
-void IGeom::updateWithTime(double time, Imath::M44f& xform)
+frame_t IGeom::updateWithTime(double time, Imath::M44f& xform)
 {
-	updateWithTimeInternal(time, xform);
+	auto ret = updateWithTimeInternal(time, xform);
 	transform = toOf(xform);
 	
 	for (int i = 0; i < m_children.size(); i++)
 	{
 		Imath::M44f m = xform;
-		m_children[i]->updateWithTime(time, m);
+		auto childFrame = m_children[i]->updateWithTime(time, m);
+		if (ret < childFrame)
+			ret = childFrame;
 	}
+
+	return ret;
+}
+
+double IGeom::updateWithFrame(frame_t frame, Imath::M44f& xform)
+{
+	auto ret = updateWithFrameInternal(frame, xform);
+	transform = toOf(xform);
+
+	for (int i = 0; i < m_children.size(); i++)
+	{
+		Imath::M44f m = xform;
+		auto childTime = m_children[i]->updateWithFrame(frame, m);
+		if (ret < childTime)
+			ret = childTime;
+	}
+
+	return ret;
 }
 
 template <typename T>
@@ -462,6 +548,7 @@ void ofxAlembic::IGeom::update_timestamp(T& object)
 		{
 			m_minTime = iTsmp->getSampleTime(0);
 			m_maxTime = iTsmp->getSampleTime(numSamps - 1);
+			m_frameCount = numSamps;
 		}
 	}
 }

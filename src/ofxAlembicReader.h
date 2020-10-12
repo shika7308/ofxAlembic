@@ -33,6 +33,11 @@ inline ofxAlembic::Type type2enum<ofxAlembic::Curves>() { return ofxAlembic::CUR
 
 template <>
 inline ofxAlembic::Type type2enum<ofxAlembic::PolyMesh>() { return ofxAlembic::POLYMESH; }
+
+template <>
+inline ofxAlembic::Type type2enum<ofxAlembic::Camera>() { return ofxAlembic::CAMERA; }
+
+typedef unsigned frame_t;
 }
 
 class ofxAlembic::Reader
@@ -49,9 +54,12 @@ public:
 
 	void setTime(double time);
 	float getTime() const { return current_time; }
+	void setFrame(frame_t frame);
+	frame_t getFrame() const { return current_frame; }
 
 	inline float getMinTime() const { return m_minTime; }
 	inline float getMaxTime() const { return m_maxTime; }
+	inline frame_t getFrameCount() const { return m_frameCount; }
 
 	void draw();
 	void debugDraw();
@@ -71,8 +79,10 @@ public:
 	bool get(size_t idx, vector<ofPolyline>& curves);
 	bool get(size_t idx, vector<ofVec3f>& points);
 	bool get(size_t idx, ofCamera &camera);
+	bool get(ofCamera& camera);
 
 	inline IGeom* get(size_t idx) { return object_arr[idx]; }
+	inline ofPtr<IGeom> get() { return m_root; }
 	
 	IGeom* get(const string& path)
 	{
@@ -99,8 +109,10 @@ protected:
 
 	Alembic::AbcGeom::chrono_t m_minTime;
 	Alembic::AbcGeom::chrono_t m_maxTime;
+	frame_t m_frameCount;
 
 	float current_time;
+	frame_t current_frame;
 };
 
 // Geom
@@ -152,14 +164,17 @@ protected:
 	vector<ofPtr<IGeom> > m_children;
 
 	virtual void setupWithObject(Alembic::AbcGeom::IObject);
-	void updateWithTime(double time, Imath::M44f& xform);
+	frame_t updateWithTime(double time, Imath::M44f& xform);
+	double updateWithFrame(frame_t frame, Imath::M44f& xform);
 
-	virtual void updateWithTimeInternal(double time, Imath::M44f& xform) {}
+	virtual frame_t updateWithTimeInternal(double time, Imath::M44f& xform) { return 0; }
+	double updateWithFrameInternal(frame_t frame, Imath::M44f& xform) { return 0; }
 	virtual void drawInternal() {}
 	virtual void debugDrawInternal() {}
 
 	Alembic::AbcGeom::chrono_t m_minTime;
 	Alembic::AbcGeom::chrono_t m_maxTime;
+	frame_t m_frameCount;
 
 	static void visit_geoms(ofPtr<IGeom> &obj, map<string, IGeom*> &object_name_map, map<string, IGeom*> &object_fullname_map);
 	
@@ -182,7 +197,8 @@ protected:
 	
 	Alembic::AbcGeom::IXform m_xform;
 	
-	void updateWithTimeInternal(double time, Imath::M44f& xform);
+	frame_t updateWithTimeInternal(double time, Imath::M44f& xform);
+	double updateWithFrameInternal(frame_t frame, Imath::M44f& xform);
 	void debugDrawInternal()
 	{
 		ofPushStyle();
@@ -218,7 +234,8 @@ protected:
 
 	Alembic::AbcGeom::IPoints m_points;
 
-	void updateWithTimeInternal(double time, Imath::M44f& xform);
+	frame_t updateWithTimeInternal(double time, Imath::M44f& xform);
+	double updateWithFrameInternal(frame_t frame, Imath::M44f& xform);
 	void drawInternal() { points.draw(); }
 };
 
@@ -241,7 +258,8 @@ protected:
 
 	Alembic::AbcGeom::ICurves m_curves;
 
-	void updateWithTimeInternal(double time, Imath::M44f& xform);
+	frame_t updateWithTimeInternal(double time, Imath::M44f& xform);
+	double updateWithFrameInternal(frame_t frame, Imath::M44f& xform);
 	void drawInternal() { curves.draw(); }
 };
 
@@ -264,7 +282,8 @@ protected:
 
 	Alembic::AbcGeom::IPolyMesh m_polyMesh;
 
-	void updateWithTimeInternal(double time, Imath::M44f& xform);
+	frame_t updateWithTimeInternal(double time, Imath::M44f& xform);
+	double updateWithFrameInternal(frame_t frame, Imath::M44f& xform);
 	void drawInternal() { polymesh.draw(); }
 };
 
@@ -286,8 +305,9 @@ public:
 protected:
 	
 	Alembic::AbcGeom::ICamera m_camera;
-	
-	void updateWithTimeInternal(double time, Imath::M44f& xform);
+
+	frame_t updateWithTimeInternal(double time, Imath::M44f& xform);
+	double updateWithFrameInternal(frame_t frame, Imath::M44f& xform);
 	void drawInternal() { camera.draw(); }
 
 };

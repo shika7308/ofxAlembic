@@ -39,7 +39,8 @@ public:
 	void draw();
 	
 	void get(Alembic::AbcGeom::OXformSchema &schema) const;
-	void set(Alembic::AbcGeom::IXformSchema &schema, float time);
+	int64_t set(Alembic::AbcGeom::IXformSchema &schema, double time);
+	double set(Alembic::AbcGeom::IXformSchema& schema, int64_t frame);
 };
 
 class ofxAlembic::PolyMesh
@@ -51,7 +52,8 @@ public:
 	PolyMesh(const ofMesh& mesh) : mesh(mesh) {}
 
 	void get(Alembic::AbcGeom::OPolyMeshSchema &schema) const;
-	void set(Alembic::AbcGeom::IPolyMeshSchema &schema, float time);
+	int64_t set(Alembic::AbcGeom::IPolyMeshSchema& schema, double time);
+	double set(Alembic::AbcGeom::IPolyMeshSchema& schema, int64_t frame);
 
 	void draw();
 };
@@ -79,7 +81,8 @@ public:
 	Points(const vector<Point>& points) : points(points) {}
 
 	void get(Alembic::AbcGeom::OPointsSchema &schema) const;
-	void set(Alembic::AbcGeom::IPointsSchema &schema, float time);
+	int64_t set(Alembic::AbcGeom::IPointsSchema &schema, double time);
+	double set(Alembic::AbcGeom::IPointsSchema& schema, int64_t frame);
 
 	void draw();
 };
@@ -93,7 +96,8 @@ public:
 	Curves(const vector<ofPolyline> &curves) : curves(curves) {}
 
 	void get(Alembic::AbcGeom::OCurvesSchema &schema) const;
-	void set(Alembic::AbcGeom::ICurvesSchema &schema, float time);
+	int64_t set(Alembic::AbcGeom::ICurvesSchema& schema, double time);
+	double set(Alembic::AbcGeom::ICurvesSchema& schema, int64_t frame);
 
 	void draw();
 };
@@ -106,7 +110,8 @@ public:
 	Camera(const ofCamera& camera) : width(0), height(0) {}
 	
 	void get(Alembic::AbcGeom::OCameraSchema &schema) const;
-	void set(Alembic::AbcGeom::ICameraSchema &schema, float time);
+	int64_t set(Alembic::AbcGeom::ICameraSchema& schema, double time);
+	double set(Alembic::AbcGeom::ICameraSchema& schema, int64_t frame);
 	
 	void setViewport(int width, int height) { this->width = width, this->height = height; }
 	
