@@ -481,6 +481,21 @@ void IGeom::draw()
 	}
 }
 
+void IGeom::draw(const std::function<void( IGeom& )>& predraw)
+{
+	ofPushMatrix();
+	ofMultMatrix(transform);
+	predraw(*this);
+	drawInternal();
+	ofPopMatrix();
+
+	for (int i = 0; i < m_children.size(); i++)
+	{
+		ofPtr<IGeom> c = m_children[i];
+		c->draw(predraw);
+	}
+}
+
 void IGeom::debugDraw()
 {
 	ofPushMatrix();

@@ -130,6 +130,7 @@ public:
 	virtual bool valid() { return m_object; }
 
 	void draw();
+	void draw(const std::function<void( IGeom& )>& predraw);
 	void debugDraw();
 	
 	inline const ofMatrix4x4& getGlobalTransform() const { return transform; }

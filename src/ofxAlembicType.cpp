@@ -501,10 +501,85 @@ double PolyMesh::set(IPolyMeshSchema& schema, int64_t frame)
 	return time;
 }
 
+template<class V, class N, class C, class T>
+void calcNormals(ofMesh_<V, N, C, T>& mesh) {
+	if (mesh.hasVertices()) {
+		auto& normals = mesh.getNormals();
+		normals.resize(mesh.getNumVertices());
+
+		const auto& vertices = mesh.getVertices();
+		ofMeshFace_<V, N, C, T> face;
+		if (!mesh.usingIndices() || !mesh.hasIndices()) {
+
+			if (mesh.getMode() == ofPrimitiveMode::OF_PRIMITIVE_TRIANGLE_STRIP) {
+				if (vertices.size() > 3) {
+					auto v0 = vertices[0];
+					auto v1 = vertices[1];
+
+					for (size_t i = 2; i < vertices.size(); i++) {
+						auto v2 = vertices[i];
+						face.setVertex(0, v0);
+						face.setVertex(1, v1);
+						face.setVertex(2, v2);
+
+						const auto& n = face.getFaceNormal();
+
+						normals[i - 2] += n;
+						normals[i - 1] += n;
+						normals[i - 0] += n;
+
+						v0 = v1;
+						v1 = v2;
+					}
+				}
+			}
+			else if (mesh.getMode() == ofPrimitiveMode::OF_PRIMITIVE_TRIANGLES) {
+				for (size_t i = 0; i < vertices.size(); i += 3) {
+					face.setVertex(0, vertices[i + 0]);
+					face.setVertex(1, vertices[i + 1]);
+					face.setVertex(2, vertices[i + 2]);
+
+					const auto& n = face.getFaceNormal();
+
+					normals[i + 0] = n;
+					normals[i + 1] = n;
+					normals[i + 2] = n;
+				}
+				return;
+			}
+		}
+		else {
+			const auto& indices = mesh.getIndices();
+			if (vertices.size() > 3 && indices.size() > 3) {
+				for (size_t i = 0; i < indices.size(); i += 3) {
+					auto& i0 = indices[i + 0];
+					auto& i1 = indices[i + 1];
+					auto& i2 = indices[i + 2];
+					face.setVertex(0, vertices[i0]);
+					face.setVertex(1, vertices[i1]);
+					face.setVertex(2, vertices[i2]);
+
+					const auto& n = face.getFaceNormal();
+
+					normals[i0] += n;
+					normals[i1] += n;
+					normals[i2] += n;
+				}
+			}
+		}
+
+		for (size_t i = 0; i < normals.size(); i++)
+			normals[i] = glm::normalize(normals[i]);
+	}
+}
+
 void PolyMesh::draw()
 {
 	if (ofGetStyle().bFill)
 	{
+		if (mesh.usingNormals() && !mesh.hasNormals()) {
+			calcNormals(mesh);
+		}
 		mesh.draw();
 	}
 	else
