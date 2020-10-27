@@ -134,6 +134,7 @@ public:
 	void debugDraw();
 	
 	inline const ofMatrix4x4& getGlobalTransform() const { return transform; }
+	inline const vector<ofPtr<IGeom> > getChildren() const { return m_children; }
 
 	size_t getIndex() const { return index; }
 	
